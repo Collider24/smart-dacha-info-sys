@@ -1,26 +1,46 @@
 from django.contrib import admin
-from .models import Sensor, Reading
+from .models import Unit, Sensor, Reading
+
+
+@admin.register(Unit)
+class UnitAdmin(admin.ModelAdmin):
+    list_display = ("code", "title")
+    search_fields = ("code", "title")
 
 
 class ReadingInline(admin.TabularInline):
     model = Reading
-    extra = 0
-    fields = ("value", "measured_at")
-    ordering = ("-measured_at",)
+    fields = ("ts", "value")
+    extra = 1
+    ordering = ("-ts",)
 
 
 @admin.register(Sensor)
 class SensorAdmin(admin.ModelAdmin):
-    list_display  = ("identifier", "name", "owner", "metric", "unit", "created_at")
-    list_filter   = ("metric", "owner")
-    search_fields = ("identifier", "name")
-    inlines       = [ReadingInline]
+    list_display = (
+        "id",
+        "user",
+        "name",
+        "unit",
+        "min_val",
+        "max_val",
+        "sampling_s",
+        "created_at",
+        "updated_at",
+    )
+    list_filter = ("unit", "sampling_s")
+    search_fields = ("name", "user__username", "user__email")
+    inlines = [ReadingInline]
+    raw_id_fields = ("user",)
+    list_select_related = ("user", "unit")
 
 
 @admin.register(Reading)
 class ReadingAdmin(admin.ModelAdmin):
-    list_display  = ("sensor", "value", "measured_at", "created_at")
-    list_filter   = ("sensor__metric",)
-    search_fields = ("sensor__identifier", "sensor__name")
+    list_display = ("sensor", "ts", "value")
+    list_filter = ("sensor__unit",)
+    search_fields = ("sensor__name", "sensor__id")
     autocomplete_fields = ("sensor",)
-    date_hierarchy = "measured_at"
+    date_hierarchy = "ts"
+    ordering = ("-ts",)
+    list_select_related = ("sensor",)

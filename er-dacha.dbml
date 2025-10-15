@@ -1,0 +1,159 @@
+Enum facility_type {
+  house
+  sauna
+  greenhouse
+  woodshed
+  garage
+  cellar
+  pool
+  grill
+}
+
+Enum alert_state {
+  open
+  ack
+  closed
+}
+
+Enum severity_level {
+  info
+  warning
+  critical
+}
+
+Enum actuator_type {
+  binary
+  level
+  setpoint
+}
+
+Enum command_status {
+  queued
+  sent
+  success
+  failed
+}
+
+Table users {
+  id integer [primary key]
+  username varchar
+  role varchar
+}
+
+Table units {
+  id integer [pk]
+  code varchar(32) [unique]
+  title varchar(120)
+}
+
+Table facilites {
+  id integer [primary key]
+  name varchar(120)
+  type facility_type
+  created_at timestampz [not null]
+}
+
+Table sensors {
+  id integer [primary key]
+  user_id integer [not null]
+  facility_id integer [not null]
+  name varchar(120)
+  unit_id integer
+  min_val double
+  max_val double
+  sampling_s int [default: 10]
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+Table readings {
+  sensor_id int [not null]
+  ts timestamptz [not null]
+  value double
+
+  Primary key (sensor_id, ts)
+
+  Indexes {
+    (ts)
+  }
+}
+
+Table actuators {
+  id int [pk]
+  sensor_id int [not null]
+  name varchar(120)
+  type actuator_type
+  range_min double
+  range_max double
+  step double
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+Table rules {
+  id int [pk]
+  user_id int [not null]
+  name varchar(160)
+  scope text [note: 'JSON фильтр: sensors[], zones[], tags']
+  expr text [note: 'Напр.: pm2_5 > 50']
+  window_s int [default: 0]
+  severity severity_level [default: 'warning']
+  enabled boolean [default: true]
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+Table alerts {
+  id int [pk]
+  rule_id int [not null]
+  sensor_id int
+  started_at timestamptz [not null]
+  ended_at timestamptz
+  state alert_state [default: 'open']
+  message text
+  ack_by int // users.id
+  ack_at timestamptz
+  severity severity_level
+
+  Indexes {
+    (rule_id)
+    (state)
+    (sensor_id)
+    (started_at)
+  }
+}
+
+Table commands {
+  id int [pk]
+  actuator_id int [not null]
+  issued_by int // users.id
+  issued_at timestamptz
+  command varchar(32) [note: 'ON/OFF/SET']
+  params text [note: 'JSON payload, напр. {"value":42}']
+  status command_status [default: 'queued']
+  completed_at timestamptz
+  error text
+
+  Indexes {
+    (actuator_id)
+    (issued_at)
+    (status)
+  }
+}
+
+Ref: sensors.user_id > users.id
+Ref: sensors.facility_id > facilites.id
+Ref: sensors.unit_id > units.id
+
+Ref: actuators.sensor_id > sensors.id
+
+Ref: commands.actuator_id > actuators.id
+Ref: commands.issued_by > users.id
+
+Ref: readings.sensor_id > sensors.id
+
+Ref: rules.user_id > users.id
+
+Ref: alerts.rule_id > rules.id
+Ref: alerts.sensor_id > sensors.id
+Ref: alerts.ack_by > users.id

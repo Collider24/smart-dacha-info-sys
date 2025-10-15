@@ -3,60 +3,81 @@ from django.db import models
 from django.utils import timezone
 
 
-class Sensor(models.Model):
-    class Metric(models.TextChoices):
-        TEMPERATURE = "temperature", "Температура"
-        HUMIDITY    = "humidity",    "Влажность"
-        SOIL        = "soil",        "Влажность почвы"
-        CO2         = "co2",         "CO₂"
-        PRESSURE    = "pressure",    "Давление"
-        LIGHT       = "light",       "Освещённость"
-        OTHER       = "other",       "Другое"
-
-    owner        = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="sensors",
-        verbose_name="Владелец",
-    )
-    identifier   = models.CharField("Идентификатор", max_length=64)
-    name         = models.CharField("Название", max_length=128, blank=True)
-    metric       = models.CharField("Измеряемая величина",
-                                    max_length=32, choices=Metric.choices)
-    unit         = models.CharField("Единица измерения", max_length=16, blank=True)
-    created_at   = models.DateTimeField("Создан", auto_now_add=True)
+class Unit(models.Model):
+    id = models.AutoField(primary_key=True)
+    code = models.CharField(max_length=32, unique=True)
+    title = models.CharField(max_length=120)
 
     class Meta:
+        db_table = "units"
+        verbose_name = "Единица измерения"
+        verbose_name_plural = "Единицы измерения"
+
+    def __str__(self):
+        return f"{self.code} — {self.title}"
+
+
+class Sensor(models.Model):
+    id = models.AutoField(primary_key=True)
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        db_column="user_id",
+        related_name="sensors",
+    )
+    name = models.CharField(max_length=120, blank=True, null=True)
+    unit = models.ForeignKey(
+        Unit,
+        on_delete=models.SET_NULL,
+        db_column="unit_id",
+        blank=True,
+        null=True,
+        related_name="sensors",
+    )
+    min_val = models.FloatField(blank=True, null=True)
+    max_val = models.FloatField(blank=True, null=True)
+    sampling_s = models.IntegerField(default=10)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "sensors"
         verbose_name = "Датчик"
         verbose_name_plural = "Датчики"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["owner", "identifier"],
-                name="unique_sensor_per_owner"
-            )
-        ]
         indexes = [
-            models.Index(fields=["owner", "metric"]),
+            models.Index(fields=["user"], name="sensors_user_idx"),
         ]
 
     def __str__(self):
-        return self.name or f"{self.identifier} ({self.get_metric_display()})"
+        return self.name or f"Sensor {self.pk}"
 
 
 class Reading(models.Model):
-    sensor      = models.ForeignKey(Sensor, on_delete=models.CASCADE,
-                                    related_name="readings", verbose_name="Датчик")
-    value       = models.FloatField("Значение")
-    measured_at = models.DateTimeField("Время измерения", default=timezone.now)
-    created_at  = models.DateTimeField("Добавлено", auto_now_add=True)
+    sensor = models.ForeignKey(
+        Sensor,
+        on_delete=models.CASCADE,
+        db_column="sensor_id",
+        related_name="readings",
+    )
+
+    ts = models.DateTimeField(db_index=False)
+    value = models.FloatField()
 
     class Meta:
+        db_table = "readings"
         verbose_name = "Показание"
         verbose_name_plural = "Показания"
-        ordering = ["-measured_at"]
-        indexes = [
-            models.Index(fields=["sensor", "measured_at"]),
+
+        constraints = [
+            models.UniqueConstraint(fields=["sensor", "ts"], name="unique_reading_per_sensor_ts")
         ]
 
+        indexes = [
+            models.Index(fields=["ts"], name="readings_ts_idx"),
+            models.Index(fields=["sensor", "ts"], name="readings_sensor_ts_idx"),
+        ]
+        ordering = ["-ts"]
+
     def __str__(self):
-        return f"{self.sensor} = {self.value} {self.sensor.unit} @ {self.measured_at:%Y-%m-%d %H:%M}"
+        return f"{self.sensor} @ {self.ts.isoformat()}: {self.value}"
