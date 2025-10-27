@@ -27,15 +27,15 @@ class SensorActuatorInlineForActuator(admin.TabularInline):
 
 @admin.register(Sensor)
 class SensorAdmin(admin.ModelAdmin):
-    list_display = ("name", "facility", "user", "unit", "sampling_s", "created_at")
-    list_filter = ("facility", "user", "unit")
+    list_display = ("name", "facility", "user", "unit", "sampling_s", "is_active", "created_at")
+    list_filter = ("facility", "user", "unit", "is_active")
     search_fields = ("name", "facility__name")
     inlines = [SensorActuatorInlineForSensor]
 
 @admin.register(Actuator)
 class ActuatorAdmin(admin.ModelAdmin):
-    list_display = ("name", "facility", "type", "range_min", "range_max", "step", "sensors_list")
-    list_filter = ("type", "facility")
+    list_display = ("name", "facility", "type", "range_min", "range_max", "step", "is_active", "sensors_list")
+    list_filter = ("type", "facility", "is_active")
     search_fields = ("name", "facility__name", "sensors__name")
     inlines = [SensorActuatorInlineForActuator]
     autocomplete_fields = ("facility",)

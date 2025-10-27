@@ -69,6 +69,7 @@ class Sensor(models.Model):
     sampling_s = models.IntegerField(default=10)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=False)
     actuators = models.ManyToManyField(
         "Actuator",
         through="SensorActuator",
@@ -106,6 +107,7 @@ class Actuator(models.Model):
     step = models.FloatField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Привод"
@@ -216,19 +218,6 @@ class Command(models.Model):
 
     def __str__(self):
         return f"{self.actuator} <- {self.name} ({self.status})"
-
-# class CommandArg(models.Model):
-#     command = models.ForeignKey(Command, on_delete=models.CASCADE, related_name="args")
-#     name = models.CharField(max_length=64)
-#     value = models.TextField()
-#
-#     class Meta:
-#         verbose_name = "Команда-Аргумент"
-#         verbose_name_plural = "Команды-Аргументы"
-#         unique_together = [("command", "name")]
-#
-#     def __str__(self):
-#         return f"{self.command_id}:{self.name}={self.value}"
 
 class RuleCommand(models.Model):
     rule = models.ForeignKey(Rule, on_delete=models.CASCADE)
