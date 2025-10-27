@@ -40,6 +40,10 @@ class Unit(models.Model):
     code = models.CharField(max_length=32, unique=True)
     title = models.CharField(max_length=120)
 
+    class Meta:
+        verbose_name = "Единица изменения"
+        verbose_name_plural = "Единицы измерения"
+
     def __str__(self):
         return f"{self.code} ({self.title})"
 
@@ -49,6 +53,8 @@ class Facility(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        verbose_name = "Постройка"
+        verbose_name_plural = "Постройки"
         indexes = [models.Index(fields=["type"])]
 
     def __str__(self):
@@ -67,6 +73,8 @@ class Sensor(models.Model):
     updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        verbose_name = "Датчик"
+        verbose_name_plural = "Датчики"
         indexes = [
             models.Index(fields=["facility"]),
             models.Index(fields=["user"]),
@@ -90,6 +98,8 @@ class Actuator(models.Model):
     updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        verbose_name = "Привод"
+        verbose_name_plural = "Приводы"
         indexes = [models.Index(fields=["sensor"]), models.Index(fields=["type"])]
 
     def __str__(self):
@@ -109,6 +119,8 @@ class Rule(models.Model):
     sensors = models.ManyToManyField(Sensor, through="RuleSensor", related_name="rules")
 
     class Meta:
+        verbose_name = "Правило"
+        verbose_name_plural = "Правила"
         indexes = [
             models.Index(fields=["user"]),
             models.Index(fields=["enabled"]),
@@ -123,6 +135,8 @@ class RuleSensor(models.Model):
     sensor = models.ForeignKey(Sensor, on_delete=models.CASCADE)
 
     class Meta:
+        verbose_name = "Правило-Сенсор"
+        verbose_name_plural = "Правила-Сенсоры"
         unique_together = [("rule", "sensor")]
         indexes = [models.Index(fields=["sensor"])]
 
@@ -141,6 +155,8 @@ class Alert(models.Model):
     ack_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        verbose_name = "Сигнал тревоги"
+        verbose_name_plural = "Сигналы тревоги"
         indexes = [
             models.Index(fields=["rule"]),
             models.Index(fields=["sensor"]),
@@ -162,6 +178,8 @@ class Command(models.Model):
     error = models.TextField(null=True, blank=True)
 
     class Meta:
+        verbose_name = "Команда"
+        verbose_name_plural = "Команды"
         indexes = [
             models.Index(fields=["actuator"]),
             models.Index(fields=["issued_at"]),
@@ -186,6 +204,8 @@ class CommandArg(models.Model):
     value = models.TextField()
 
     class Meta:
+        verbose_name = "Команда-Аргумент"
+        verbose_name_plural = "Команды-Аргументы"
         unique_together = [("command", "name")]
 
     def __str__(self):
