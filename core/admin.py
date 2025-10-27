@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Unit, Facility, Sensor, Actuator, Rule, RuleSensor, Alert, Command, CommandArg, SensorActuator
+from .models import (Unit, Facility, Sensor, Actuator, Rule, RuleSensor, Alert, Command, SensorActuator,
+                     RuleCommand)
 
 @admin.register(Unit)
 class UnitAdmin(admin.ModelAdmin):
@@ -11,10 +12,6 @@ class FacilityAdmin(admin.ModelAdmin):
     list_display = ("name", "type", "created_at")
     list_filter = ("type",)
     search_fields = ("name",)
-
-class CommandArgInline(admin.TabularInline):
-    model = CommandArg
-    extra = 0
 
 class SensorActuatorInlineForSensor(admin.TabularInline):
     model = SensorActuator
@@ -54,21 +51,24 @@ class RuleSensorInline(admin.TabularInline):
     model = RuleSensor
     extra = 0
 
+class RuleCommandInline(admin.TabularInline):
+    model = RuleCommand
+    extra = 0
+
 @admin.register(Rule)
 class RuleAdmin(admin.ModelAdmin):
     list_display = ("name", "user", "severity", "enabled", "window_s", "created_at")
     list_filter = ("enabled", "severity", "user")
-    inlines = [RuleSensorInline]
+    inlines = [RuleSensorInline, RuleCommandInline]
     search_fields = ("name", "expr")
 
 @admin.register(Alert)
 class AlertAdmin(admin.ModelAdmin):
-    list_display = ("state", "rule", "sensor", "started_at", "ended_at", "ack_by", "ack_at")
+    list_display = ("state", "rule", "started_at", "ended_at", "ack_by", "ack_at")
     list_filter = ("state", "rule__severity")
     search_fields = ("message",)
 
 @admin.register(Command)
 class CommandAdmin(admin.ModelAdmin):
-    list_display = ("actuator", "command", "status", "issued_by", "issued_at", "completed_at")
-    list_filter = ("status", "command", "actuator__type")
-    inlines = [CommandArgInline]
+    list_display = ("actuator", "name", "created_by", "created_at", "commands_args", "status")
+    list_filter = ("status", "name", "actuator__type")

@@ -28,10 +28,8 @@ Enum actuator_type {
 }
 
 Enum command_status {
-  queued
-  sent
-  success
-  failed
+  free
+  inprogress
 }
 
 Enum user_role {
@@ -149,10 +147,22 @@ Table rule_sensors{
   }
 }
 
+
+Table rule_commands{
+  rule_id   int  [not null]
+  command_id int  [not null]
+
+  Primary key (rule_id, command_id)
+
+  Indexes {
+    (command_id)
+  }
+}
+
+
 Table alerts {
   id          int            [pk]
   rule_id     int            [not null]
-  sensor_id   int
   started_at  timestamptz    [not null]
   ended_at    timestamptz
   state       alert_state    [not null, default: 'open']
@@ -162,7 +172,6 @@ Table alerts {
 
   Indexes {
     (rule_id)
-    (sensor_id)
     (state)
     (started_at)
   }
@@ -171,29 +180,18 @@ Table alerts {
 Table commands {
   id           int            [pk]
   actuator_id  int            [not null]
-  issued_by    int            // users.id
-  issued_at    timestamptz    [not null, default: `now()`]
-  command      varchar(32)    [not null, note: 'ON|OFF|SET (валидация бизнес-логикой)']
-  status       command_status [not null, default: 'queued']
-  completed_at timestamptz
-  error        text
+  name         varchar(32)    [not null]
+  created_by   int            // users.id
+  created_at   timestamptz    [not null, default: `now()`]
+  commands_args     text
+  status       command_status [not null, default: 'free']
 
   Indexes {
     (actuator_id)
-    (issued_at)
+    (created_at)
     (status)
   }
 }
-
-Table command_args {
-  command_id int         [not null]
-  name       varchar(64) [not null]
-  value      text        [not null]
-
-  Primary key (command_id, name)
-}
-
-Ref: command_args.command_id > commands.id [delete: cascade]
 
 
 Ref: sensors.user_id       > users.id
@@ -206,14 +204,15 @@ Ref: sensor_actuators.sensor_id   > sensors.id [delete: cascade]
 Ref: sensor_actuators.actuator_id > actuators.id [delete: cascade]
 
 Ref: commands.actuator_id  > actuators.id
-Ref: commands.issued_by    > users.id
+Ref: commands.created_by    > users.id
 
 Ref: readings.sensor_id    > sensors.id
 
 Ref: rules.user_id         > users.id
 Ref: rule_sensors.rule_id  > rules.id
 Ref: rule_sensors.sensor_id> sensors.id
+Ref: rule_commands.rule_id  > rules.id
+Ref: rule_commands.command_id > commands.id
 
 Ref: alerts.rule_id        > rules.id
-Ref: alerts.sensor_id      > sensors.id
 Ref: alerts.ack_by         > users.id

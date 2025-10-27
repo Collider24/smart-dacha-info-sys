@@ -30,10 +30,8 @@ class ActuatorType(models.TextChoices):
     SETPOINT = "setpoint"
 
 class CommandStatus(models.TextChoices):
-    QUEUED = "queued"
-    SENT = "sent"
-    SUCCESS = "success"
-    FAILED = "failed"
+    FREE = "free"
+    INPROGRESS = "inprogress"
 
 # ===== Reference tables =====
 class Unit(models.Model):
@@ -179,7 +177,6 @@ class RuleSensor(models.Model):
 # ===== Alerts =====
 class Alert(models.Model):
     rule = models.ForeignKey(Rule, on_delete=models.CASCADE, related_name="alerts")
-    sensor = models.ForeignKey(Sensor, on_delete=models.SET_NULL, null=True, blank=True, related_name="alerts")
     started_at = models.DateTimeField()
     ended_at = models.DateTimeField(null=True, blank=True)
     state = models.CharField(max_length=16, choices=AlertState.choices, default=AlertState.OPEN)
@@ -192,7 +189,6 @@ class Alert(models.Model):
         verbose_name_plural = "Сигналы тревоги"
         indexes = [
             models.Index(fields=["rule"]),
-            models.Index(fields=["sensor"]),
             models.Index(fields=["state"]),
             models.Index(fields=["started_at"]),
         ]
@@ -203,43 +199,46 @@ class Alert(models.Model):
 # ===== Commands =====
 class Command(models.Model):
     actuator = models.ForeignKey(Actuator, on_delete=models.CASCADE, related_name="commands")
-    issued_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="commands")
-    issued_at = models.DateTimeField(auto_now_add=True)
-    command = models.CharField(max_length=32, help_text="ON|OFF|SET")
-    status = models.CharField(max_length=16, choices=CommandStatus.choices, default=CommandStatus.QUEUED)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    error = models.TextField(null=True, blank=True)
+    name = models.CharField(null=True, max_length=160)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="commands")
+    created_at = models.DateTimeField(auto_now_add=True)
+    commands_args = models.TextField(blank=True)
+    status = models.CharField(max_length=16, choices=CommandStatus.choices, default=CommandStatus.FREE)
 
     class Meta:
         verbose_name = "Команда"
         verbose_name_plural = "Команды"
         indexes = [
             models.Index(fields=["actuator"]),
-            models.Index(fields=["issued_at"]),
+            models.Index(fields=["created_by"]),
             models.Index(fields=["status"]),
         ]
 
-    # core/models.py (внутри Command)
-    def clean(self):
-        from django.core.exceptions import ValidationError
-        a_type = self.actuator.type
-        if self.command.upper() == "SET" and a_type not in (ActuatorType.LEVEL, ActuatorType.SETPOINT):
-            raise ValidationError("SET допустим только для actuator type LEVEL/SETPOINT.")
-        if self.command.upper() in ("ON", "OFF") and a_type != ActuatorType.BINARY:
-            raise ValidationError("ON/OFF допустимы только для actuator type BINARY.")
-
     def __str__(self):
-        return f"{self.actuator} <- {self.command} ({self.status})"
+        return f"{self.actuator} <- {self.name} ({self.status})"
 
-class CommandArg(models.Model):
-    command = models.ForeignKey(Command, on_delete=models.CASCADE, related_name="args")
-    name = models.CharField(max_length=64)
-    value = models.TextField()
+# class CommandArg(models.Model):
+#     command = models.ForeignKey(Command, on_delete=models.CASCADE, related_name="args")
+#     name = models.CharField(max_length=64)
+#     value = models.TextField()
+#
+#     class Meta:
+#         verbose_name = "Команда-Аргумент"
+#         verbose_name_plural = "Команды-Аргументы"
+#         unique_together = [("command", "name")]
+#
+#     def __str__(self):
+#         return f"{self.command_id}:{self.name}={self.value}"
+
+class RuleCommand(models.Model):
+    rule = models.ForeignKey(Rule, on_delete=models.CASCADE)
+    command = models.ForeignKey(Command, on_delete=models.CASCADE)
 
     class Meta:
-        verbose_name = "Команда-Аргумент"
-        verbose_name_plural = "Команды-Аргументы"
-        unique_together = [("command", "name")]
+        verbose_name = "Правило-Команда"
+        verbose_name_plural = "Правила-Команды"
+        unique_together = [("rule", "command")]
+        indexes = [models.Index(fields=["command"])]
 
     def __str__(self):
-        return f"{self.command_id}:{self.name}={self.value}"
+        return f"{self.rule_id}->{self.command_id}"
