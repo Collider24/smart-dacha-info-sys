@@ -71,6 +71,12 @@ class Sensor(models.Model):
     sampling_s = models.IntegerField(default=10)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(null=True, blank=True)
+    actuators = models.ManyToManyField(
+        "Actuator",
+        through="SensorActuator",
+        related_name="sensors",
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "Датчик"
@@ -88,7 +94,13 @@ class Sensor(models.Model):
 
 # ===== Actuators =====
 class Actuator(models.Model):
-    sensor = models.ForeignKey(Sensor, on_delete=models.CASCADE, related_name="actuators")
+
+    facility = models.ForeignKey(
+        "Facility",
+        on_delete=models.CASCADE,
+        related_name="actuators",
+        null=True, blank=True,
+    )
     name = models.CharField(max_length=120)
     type = models.CharField(max_length=16, choices=ActuatorType.choices)
     range_min = models.FloatField(null=True, blank=True)
@@ -100,10 +112,31 @@ class Actuator(models.Model):
     class Meta:
         verbose_name = "Привод"
         verbose_name_plural = "Приводы"
-        indexes = [models.Index(fields=["sensor"]), models.Index(fields=["type"])]
+        indexes = [
+            models.Index(fields=["type"]),
+            models.Index(fields=["facility"]),
+        ]
 
     def __str__(self):
-        return f"{self.sensor}::{self.name}"
+        fac = getattr(self, "facility", None)
+        fac_part = f"{fac.name}" if fac else "?"
+        return f"{fac_part}::{self.name}"
+
+class SensorActuator(models.Model):
+    sensor = models.ForeignKey("Sensor", on_delete=models.CASCADE)
+    actuator = models.ForeignKey("Actuator", on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name = "Датчик–Привод"
+        verbose_name_plural = "Датчики–Приводы"
+        unique_together = [("sensor", "actuator")]
+        indexes = [
+            models.Index(fields=["sensor"]),
+            models.Index(fields=["actuator"]),
+        ]
+
+    def __str__(self):
+        return f"S{self.sensor_id} <-> A{self.actuator_id}"
 
 # ===== Rules =====
 class Rule(models.Model):

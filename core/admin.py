@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Unit, Facility, Sensor, Actuator, Rule, RuleSensor, Alert, Command, CommandArg
+from .models import Unit, Facility, Sensor, Actuator, Rule, RuleSensor, Alert, Command, CommandArg, SensorActuator
 
 @admin.register(Unit)
 class UnitAdmin(admin.ModelAdmin):
@@ -16,17 +16,39 @@ class CommandArgInline(admin.TabularInline):
     model = CommandArg
     extra = 0
 
+class SensorActuatorInlineForSensor(admin.TabularInline):
+    model = SensorActuator
+    fk_name = "sensor"
+    extra = 0
+    autocomplete_fields = ("actuator",)
+
+class SensorActuatorInlineForActuator(admin.TabularInline):
+    model = SensorActuator
+    fk_name = "actuator"
+    extra = 0
+    autocomplete_fields = ("sensor",)
+
 @admin.register(Sensor)
 class SensorAdmin(admin.ModelAdmin):
     list_display = ("name", "facility", "user", "unit", "sampling_s", "created_at")
     list_filter = ("facility", "user", "unit")
-    search_fields = ("name",)
+    search_fields = ("name", "facility__name")
+    inlines = [SensorActuatorInlineForSensor]
 
 @admin.register(Actuator)
 class ActuatorAdmin(admin.ModelAdmin):
-    list_display = ("name", "sensor", "type", "range_min", "range_max", "step")
-    list_filter = ("type", "sensor__facility")
-    search_fields = ("name",)
+    list_display = ("name", "facility", "type", "range_min", "range_max", "step", "sensors_list")
+    list_filter = ("type", "facility")
+    search_fields = ("name", "facility__name", "sensors__name")
+    inlines = [SensorActuatorInlineForActuator]
+    autocomplete_fields = ("facility",)
+
+    def sensors_list(self, obj):
+        names = list(obj.sensors.values_list("name", flat=True)[:5])
+        more = obj.sensors.count() - len(names)
+        return ", ".join(names) + (f" (+{more})" if more > 0 else "")
+    sensors_list.short_description = "Датчики"
+
 
 class RuleSensorInline(admin.TabularInline):
     model = RuleSensor
