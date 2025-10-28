@@ -34,7 +34,8 @@ class SensorAdmin(admin.ModelAdmin):
 
 @admin.register(Actuator)
 class ActuatorAdmin(admin.ModelAdmin):
-    list_display = ("name", "facility", "type", "range_min", "range_max", "step", "is_active", "sensors_list")
+    list_display = ("name", "facility", "type", "range_min", "range_max", "step", "is_active", "current_value",
+                    "sensors_list")
     list_filter = ("type", "facility", "is_active")
     search_fields = ("name", "facility__name", "sensors__name")
     inlines = [SensorActuatorInlineForActuator]
@@ -64,8 +65,8 @@ class RuleAdmin(admin.ModelAdmin):
 
 @admin.register(Alert)
 class AlertAdmin(admin.ModelAdmin):
-    list_display = ("state", "rule", "started_at", "ended_at", "ack_by", "ack_at")
-    list_filter = ("state", "rule__severity")
+    list_display = ("rule", "started_at")
+    list_filter = ["rule__severity"]
     search_fields = ("message",)
 
 @admin.register(Command)

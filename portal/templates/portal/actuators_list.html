@@ -7,7 +7,8 @@
 </div>
 <table class="table table-sm table-hover align-middle">
   <thead><tr>
-    <th>Постройка</th><th>Название</th><th>Тип</th><th>Диапазон</th><th>Шаг</th><th>Активен</th><th class="text-end">Действия</th>
+    <th>Постройка</th><th>Название</th><th>Тип</th><th>Диапазон</th><th>Шаг</th><th>Активен</th>
+    <th>Текущее значение</th><th class="text-end">Действия</th>
   </tr></thead>
   <tbody>
   {% for a in object_list %}
@@ -18,6 +19,7 @@
       <td>{% if a.range_min != None and a.range_max != None %}{{ a.range_min }}…{{ a.range_max }}{% endif %}</td>
       <td>{{ a.step }}</td>
       <td>{% if a.is_active %}✅{% else %}—{% endif %}</td>
+      <td>{{ a.current_value }}</td>
       <td class="text-end">
         <a class="btn btn-outline-primary btn-sm" href="{% url 'portal:actuators_edit' a.pk %}">Править</a>
         <a class="btn btn-outline-danger btn-sm" href="{% url 'portal:actuators_delete' a.pk %}">Удалить</a>

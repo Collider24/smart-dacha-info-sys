@@ -48,7 +48,9 @@ def dashboard(request):
     if not request.user.is_authenticated:
         return redirect("portal:login")
     ctx = {
+        "sensors_active_count" : f"{Sensor.objects.filter(is_active=True).count()}/{Sensor.objects.count()}",
         "sensors_count": Sensor.objects.count(),
+        "actuators_active_count": f"{Actuator.objects.filter(is_active=True).count()}/{Actuator.objects.count()}",
         "actuators_count": Actuator.objects.count(),
         "facilities_count": Facility.objects.count(),
         "rules_count": Rule.objects.count(),
@@ -113,7 +115,7 @@ class ActuatorCreateView(LoginRequiredMixin, CreateView):
 
 class ActuatorUpdateView(LoginRequiredMixin, UpdateView):
     model = Actuator
-    fields = ["facility", "name", "type", "range_min", "range_max", "step", "is_active"]
+    fields = ["facility", "name", "type", "range_min", "range_max", "step", "is_active", "current_value"]
     template_name = "portal/form.html"
     success_url = reverse_lazy("portal:actuators_list")
 

@@ -14,11 +14,6 @@ class FacilityType(models.TextChoices):
     POOL = "pool"
     GRILL = "grill"
 
-class AlertState(models.TextChoices):
-    OPEN = "open"
-    ACK = "ack"
-    CLOSED = "closed"
-
 class SeverityLevel(models.TextChoices):
     INFO = "info"
     WARNING = "warning"
@@ -108,6 +103,7 @@ class Actuator(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=False)
+    current_value = models.FloatField(default=0)
 
     class Meta:
         verbose_name = "Привод"
@@ -180,23 +176,18 @@ class RuleSensor(models.Model):
 class Alert(models.Model):
     rule = models.ForeignKey(Rule, on_delete=models.CASCADE, related_name="alerts")
     started_at = models.DateTimeField()
-    ended_at = models.DateTimeField(null=True, blank=True)
-    state = models.CharField(max_length=16, choices=AlertState.choices, default=AlertState.OPEN)
     message = models.TextField(null=True, blank=True)
-    ack_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="acked_alerts")
-    ack_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Сигнал тревоги"
         verbose_name_plural = "Сигналы тревоги"
         indexes = [
             models.Index(fields=["rule"]),
-            models.Index(fields=["state"]),
             models.Index(fields=["started_at"]),
         ]
 
     def __str__(self):
-        return f"[{self.state}] {self.rule.name} @ {self.started_at}"
+        return f"{self.rule.name} @ {self.started_at}"
 
 # ===== Commands =====
 class Command(models.Model):
