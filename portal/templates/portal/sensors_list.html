@@ -1,0 +1,225 @@
+{% extends "portal/base.html" %}
+{% block title %}Датчики{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="h4">Датчики</h1>
+  <a class="btn btn-success btn-sm" href="{% url 'portal:sensors_create' %}">+ Добавить</a>
+</div>
+
+<table class="table table-sm table-hover align-middle">
+  <thead>
+    <tr>
+      <th>Постройка</th><th>Название</th><th>Ед.изм.</th><th>Период, с</th><th>Активен</th>
+      <th class="text-end">Действия</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for s in object_list %}
+    <tr>
+      <td>{{ s.facility.name }}</td>
+      <td>{{ s.name }}</td>
+      <td>{% if s.unit %}{{ s.unit.code }}{% endif %}</td>
+      <td>{{ s.sampling_s }}</td>
+      <td>{% if s.is_active %}✅{% else %}—{% endif %}</td>
+      <td class="text-end">
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'portal:sensors_edit' s.pk %}">Править</a>
+        <a class="btn btn-outline-danger btn-sm" href="{% url 'portal:sensors_delete' s.pk %}">Удалить</a>
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" class="text-center text-muted">Пока ничего</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if is_paginated %}
+<nav>
+  <ul class="pagination pagination-sm">
+    {% if page_obj.has_previous %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a></li>
+    {% endif %}
+    {% for p in paginator.page_range %}
+      <li class="page-item {% if p == page_obj.number %}active{% endif %}">
+        <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+      </li>
+    {% endfor %}
+    {% if page_obj.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
+<hr/>
+<h2 class="h5">График показаний</h2>
+<div class="row g-2 mb-2 align-items-center">
+  <div class="col-auto">
+    <select id="sensorSelect" class="form-select form-select-sm">
+      <option value="">— выбери датчик —</option>
+    </select>
+  </div>
+  <div class="col-auto">
+    <select id="rangeSelect" class="form-select form-select-sm">
+      <option value="1h">1 час</option>
+      <option value="3h">3 часа</option>
+      <option value="6h">6 часов</option>
+      <option value="12h">12 часов</option>
+      <option value="24h" selected>24 часа</option>
+    </select>
+  </div>
+  <div class="col-auto form-check">
+    <input class="form-check-input" type="checkbox" id="fitToData" checked>
+    <label class="form-check-label" for="fitToData">Подогнать к данным</label>
+  </div>
+  <div class="col-auto">
+    <button id="refreshBtn" class="btn btn-outline-secondary btn-sm">Обновить</button>
+  </div>
+</div>
+
+<div style="height: 320px;">
+  <canvas id="chart"></canvas>
+</div>
+<p id="seriesInfo" class="text-muted small mt-2"></p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let chart;
+
+function ensureChart(){
+  if (chart) return;
+  const ctx = document.getElementById('chart');
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Значение',
+        data: [],
+        parsing: false,
+        tension: 0.2,
+        pointRadius: 2,
+        pointHitRadius: 6,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: 'nearest', intersect: false },
+      scales: {
+        x: {
+          type: 'time',
+          time: { tooltipFormat: 'dd.MM.yyyy HH:mm:ss' },
+          ticks: { source: 'auto' },
+          bounds: 'ticks'
+        },
+        y: { beginAtZero: false }
+      },
+      plugins: { legend: { display: true } }
+    }
+  });
+}
+
+function getRangeDurationMs(rangeStr){
+  const m = /^(\d+)([smhd])$/.exec(rangeStr);
+  if (!m) return 24*3600*1000;
+  const n = parseInt(m[1],10), u = m[2];
+  const mult = { s:1000, m:60000, h:3600000, d:86400000 }[u] || 3600000;
+  return n * mult;
+}
+
+function pickTimeUnit(durMs){
+  if (durMs <= 3*3600000)  return 'minute';
+  if (durMs <= 12*3600000) return 'hour';
+  return 'hour';
+}
+
+function loadSensors(){
+  $.getJSON("{% url 'portal:api_sensors' %}")
+    .done(function(resp){
+      const $sel = $("#sensorSelect").empty().append(`<option value="">— выбери датчик —</option>`);
+      resp.sensors.forEach(s => {
+        $sel.append(`<option value="${s.id}">${s['facility__name']} — ${s.name}</option>`);
+      });
+    })
+    .fail(function(xhr){
+      console.error("api_sensors fail", xhr.status, xhr.responseText);
+    });
+}
+
+function loadSeries(){
+  const id = $("#sensorSelect").val();
+  const range = $("#rangeSelect").val();
+  const fit = $("#fitToData").is(":checked");
+  if (!id) {
+    $("#seriesInfo").text("Выбери датчик, чтобы увидеть график.");
+    return;
+  }
+
+  ensureChart();
+
+  const url = `{% url 'portal:api_sensor_series' 0 %}`.replace('/0/', `/${id}/`) + `?range=${range}`;
+  $.getJSON(url)
+    .done(function(resp){
+      const rows = (resp && resp.series) ? resp.series : [];
+      const pts = rows.map(p => ({ x: p.t, y: p.v }));
+      chart.data.datasets[0].data = pts;
+
+      const durMs = getRangeDurationMs(range);
+      chart.options.scales.x.time.unit = pickTimeUnit(durMs);
+
+      if (pts.length > 0) {
+        const first = pts[0].x;
+        const last  = pts[pts.length-1].x;
+
+        if (fit) {
+          const pad = Math.max(60000, Math.round((last - first) * 0.2));
+          chart.options.scales.x.min = first - pad;
+          chart.options.scales.x.max = last + pad;
+        } else {
+          const now = Date.now();
+          chart.options.scales.x.min = now - durMs;
+          chart.options.scales.x.max = now;
+        }
+
+        const ys = pts.map(p => +p.y).filter(Number.isFinite);
+        if (ys.length) {
+          const ymin = Math.min(...ys), ymax = Math.max(...ys);
+          const padY = (ymax - ymin) === 0 ? Math.max(1, Math.abs(ymax)*0.1) : (ymax - ymin) * 0.1;
+          chart.options.scales.y.min = ymin - padY;
+          chart.options.scales.y.max = ymax + padY;
+        } else {
+          chart.options.scales.y.min = undefined;
+          chart.options.scales.y.max = undefined;
+        }
+      } else {
+        const now = Date.now();
+        chart.options.scales.x.min = now - durMs;
+        chart.options.scales.x.max = now;
+        chart.options.scales.y.min = undefined;
+        chart.options.scales.y.max = undefined;
+      }
+
+      chart.update();
+
+      const info = pts.length
+        ? `Загружено ${pts.length} точек. Последняя: ${new Date(pts[pts.length-1].x).toISOString()} → ${pts[pts.length-1].y}`
+        : "Точек нет в выбранном диапазоне.";
+      $("#seriesInfo").text(info);
+    })
+    .fail(function(xhr){
+      console.error("api_sensor_series fail", xhr.status, xhr.responseText);
+      $("#seriesInfo").text("Ошибка связи с сервером");
+    });
+}
+
+$(function(){
+  loadSensors();
+  $("#sensorSelect,#rangeSelect,#fitToData").on("change", loadSeries);
+  $("#refreshBtn").on("click", loadSeries);
+  setInterval(function(){ if ($("#sensorSelect").val()) loadSeries(); }, 10000);
+});
+</script>
+{% endblock %}

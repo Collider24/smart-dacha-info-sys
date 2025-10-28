@@ -1,0 +1,30 @@
+{% extends "portal/base.html" %}
+{% block title %}Вход{% endblock %}
+{% block content %}
+{% load form_extras %}
+<div class="row justify-content-center">
+  <div class="col-md-4">
+    <h1 class="h4 mb-3">Вход</h1>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+      <div class="mb-3">
+        <label class="form-label">Логин</label>
+        {{ form.username|add_class:"form-control" }}
+        {{ form.username.errors }}
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Пароль</label>
+        {{ form.password|add_class:"form-control" }}
+        {{ form.password.errors }}
+      </div>
+      <div class="form-actions d-flex">
+        <button class="btn btn-primary">Войти</button>
+        <a href="{% url 'portal:signup' %}" class="btn btn-outline-secondary">Регистрация</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "portal/base.html" %}
+{% block title %}Панель{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Панель управления</h1>
+<div class="row g-3">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted">Датчиков</div>
+        <div class="display-6">{{ sensors_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted">Приводов</div>
+        <div class="display-6">{{ actuators_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted">Построек</div>
+        <div class="display-6">{{ facilities_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted">Правил</div>
+        <div class="display-6">{{ rules_count }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

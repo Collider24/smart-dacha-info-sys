@@ -1,0 +1,28 @@
+{% extends "portal/base.html" %}
+{% block title %}Регистрация{% endblock %}
+{% block content %}
+{% load form_extras %}
+<div class="row justify-content-center">
+  <div class="col-md-4">
+    <h1 class="h4 mb-3">Регистрация</h1>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+      {% for field in form %}
+        <div class="mb-3">
+          <label class="form-label">{{ field.label }}</label>
+          {{ field|add_class:"form-control" }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text|safe }}</div>{% endif %}
+          {{ field.errors }}
+        </div>
+      {% endfor %}
+      <div class="form-actions d-flex">
+        <button class="btn btn-success">Создать аккаунт</button>
+        <a href="{% url 'portal:login' %}" class="btn btn-outline-secondary">Войти</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
