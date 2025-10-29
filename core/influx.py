@@ -13,7 +13,7 @@ _client = InfluxDBClient(
 _write = _client.write_api(write_options=SYNCHRONOUS)
 _query = _client.query_api()
 
-MEASUREMENT = "readings"  # имя измерения в Influx
+MEASUREMENT = "readings"
 
 def write_reading(sensor_id: int, ts: datetime, value: float):
     """
@@ -36,8 +36,9 @@ def write_reading(sensor_id: int, ts: datetime, value: float):
 
 def latest_reading(sensor_id: int):
     """
-    Получить последнее значение для сенсора.
-    Возвращает (ts, value) или None.
+    Вернёт последнее значение по времени для данного сенсора:
+    (timestamp: datetime, value: float) или None.
+    Схлопывает все группы (все теги) и берёт глобально последнее.
     """
     flux = f'''
 from(bucket: "{settings.INFLUX_BUCKET}")
@@ -45,25 +46,36 @@ from(bucket: "{settings.INFLUX_BUCKET}")
   |> filter(fn: (r) => r["_measurement"] == "{MEASUREMENT}")
   |> filter(fn: (r) => r["sensor_id"] == "{sensor_id}")
   |> filter(fn: (r) => r["_field"] == "value")
+  |> group(columns: [])            // убрать все группировки, чтобы last() был глобальным
   |> last()
+  |> keep(columns: ["_time","_value"])
+'''
+    tables = _query.query(flux, org=settings.INFLUX_ORG)
+
+    latest = None
+    for table in tables:
+        for rec in table.records:
+            ts = rec.get_time()
+            val = rec.get_value()
+            if latest is None or ts > latest[0]:
+                latest = (ts, float(val) if val is not None else None)
+
+    return latest
+
+def latest_value(sensor_id: int) -> float | None:
+    flux = f'''
+from(bucket: "{settings.INFLUX_BUCKET}")
+  |> range(start: -30d)
+  |> filter(fn: (r) => r["_measurement"] == "{MEASUREMENT}")
+  |> filter(fn: (r) => r["sensor_id"] == "{sensor_id}")
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> group(columns: [])
+  |> last()
+  |> keep(columns: ["_value"])
 '''
     tables = _query.query(flux, org=settings.INFLUX_ORG)
     for table in tables:
         for rec in table.records:
-            return (rec.get_time(), rec.get_value())
+            val = rec.get_value()
+            return float(val) if val is not None else None
     return None
-
-def window_stats(sensor_id: int, window_seconds: int):
-    """
-    Пример окна: среднее/мин/макс за окно (последние window_seconds).
-    """
-    flux = f'''
-from(bucket: "{settings.INFLUX_BUCKET}")
-  |> range(start: -{window_seconds}s)
-  |> filter(fn: (r) => r["_measurement"] == "{MEASUREMENT}")
-  |> filter(fn: (r) => r["sensor_id"] == "{sensor_id}")
-  |> filter(fn: (r) => r["_field"] == "value")
-  |> keep(columns: ["_time","_value"])
-  |> yield(name:"raw")
-'''
-    return _query.query_data_frame(flux, org=settings.INFLUX_ORG)

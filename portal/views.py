@@ -8,15 +8,17 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 
-from core.models import Sensor, Actuator, Facility, Rule
+from core.models import Sensor, Actuator, Facility, Rule, Alert
 from core import influx
 from django.views.decorators.http import require_GET
 import logging
+
+from portal.forms import AlertForm
+
 log = logging.getLogger(__name__)
 
 User = get_user_model()
 
-# --- Аутентификация ---
 class LoginView(View):
     def get(self, request):
         return render(request, "portal/login.html", {"form": AuthenticationForm()})
@@ -43,10 +45,21 @@ class SignupView(View):
             return redirect("portal:dashboard")
         return render(request, "portal/signup.html", {"form": form})
 
-# --- Главная ---
 def dashboard(request):
     if not request.user.is_authenticated:
         return redirect("portal:login")
+    alerts_recent = (
+        Alert.objects.select_related('rule')
+        .order_by('-started_at')[:10]
+    )
+
+    active_sensors = list(
+        Sensor.objects.filter(is_active=True)
+        .select_related('facility', 'unit')
+        .values('id', 'name', 'facility__name', 'unit__code')
+        .order_by('facility__name', 'name')
+    )
+
     ctx = {
         "sensors_active_count" : f"{Sensor.objects.filter(is_active=True).count()}/{Sensor.objects.count()}",
         "sensors_count": Sensor.objects.count(),
@@ -54,10 +67,11 @@ def dashboard(request):
         "actuators_count": Actuator.objects.count(),
         "facilities_count": Facility.objects.count(),
         "rules_count": Rule.objects.count(),
+        "alerts_recent": alerts_recent,
+        'active_sensors': active_sensors,
     }
     return render(request, "portal/dashboard.html", ctx)
 
-# --- CRUD (Generic Views) ---
 class SensorListView(LoginRequiredMixin, ListView):
     model = Sensor
     template_name = "portal/sensors_list.html"
@@ -95,7 +109,6 @@ class SensorDeleteView(LoginRequiredMixin, DeleteView):
     template_name = "portal/confirm_delete.html"
     success_url = reverse_lazy("portal:sensors_list")
 
-# Аналогично для Actuator/Facility/Rule:
 class ActuatorListView(LoginRequiredMixin, ListView):
     model = Actuator
     template_name = "portal/actuators_list.html"
@@ -197,7 +210,37 @@ class RuleDeleteView(LoginRequiredMixin, DeleteView):
     template_name = "portal/confirm_delete.html"
     success_url = reverse_lazy("portal:rules_list")
 
-# --- API для Chart.js ---
+class AlertsListView(ListView):
+    model = Alert
+    template_name = "portal/alerts_list.html"
+    context_object_name = "object_list"
+    paginate_by = 20
+
+    def get_queryset(self):
+        return (
+            Alert.objects.select_related("rule")
+            .order_by("-started_at")
+        )
+
+class AlertUpdateView(UpdateView):
+    model = Alert
+    form_class = AlertForm
+    template_name = "portal/form.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["page_title"] = "Правка оповещения"
+        return ctx
+
+    def get_success_url(self):
+        return reverse_lazy("portal:alerts_list")
+
+class AlertDeleteView(DeleteView):
+    model = Alert
+    template_name = "portal/confirm_delete.html"
+    success_url = reverse_lazy("portal:alerts_list")
+
+
 def api_sensors(request):
     data = list(Sensor.objects.filter(is_active=True)
                 .order_by("facility__name","name")

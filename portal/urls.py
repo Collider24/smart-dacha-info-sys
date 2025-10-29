@@ -30,6 +30,10 @@ urlpatterns = [
     path("rules/<int:pk>/edit/", views.RuleUpdateView.as_view(), name="rules_edit"),
     path("rules/<int:pk>/delete/", views.RuleDeleteView.as_view(), name="rules_delete"),
 
+    path("alerts/", views.AlertsListView.as_view(), name="alerts_list"),
+    path("alerts/<int:pk>/edit/", views.AlertUpdateView.as_view(), name="alerts_edit"),
+    path("alerts/<int:pk>/delete/", views.AlertDeleteView.as_view(), name="alerts_delete"),
+
     path("api/sensors/", views.api_sensors, name="api_sensors"),
     path("api/sensors/<int:sensor_id>/series/", views.api_sensor_series, name="api_sensor_series"),
 ]
